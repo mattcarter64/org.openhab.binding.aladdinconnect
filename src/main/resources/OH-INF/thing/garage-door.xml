@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="aladdinconnect"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<!-- Sample Thing Type -->
+	<thing-type id="garagedoor">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="aladdinconnectbridge"/>
+		</supported-bridge-type-refs>
+
+		<label>Garage Door</label>
+		<description>Aladdin Garage Door</description>
+
+		<channels>
+			<channel id="door-status" typeId="door-status">
+				<label>Current state of the door</label>
+			</channel>
+
+			<channel id="door-position" typeId="door-position">
+				<label>Requested state of door</label>
+			</channel>
+		</channels>
+
+		<config-description>
+			<parameter name="notifications" type="boolean">
+				<label>Push Notifications</label>
+				<description>Send push notifications (Bridge notifications option supercedes this option)</description>
+				<default>false</default>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+</thing:thing-descriptions>

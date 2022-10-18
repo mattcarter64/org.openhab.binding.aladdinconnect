@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="aladdinconnect"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<!-- Channel Types -->
+	<channel-type id="discovery">
+		<item-type>Switch</item-type>
+		<label>Start / Stop discovery</label>
+		<description>Start / stop discovery mode for Aladdin Connect devices</description>
+		<category>Switch</category>
+		<state readOnly="false"/>
+	</channel-type>
+
+	<channel-type id="door-position">
+		<item-type>Number</item-type>
+		<label>Door position</label>
+		<description>Requested door position
+		</description>
+		<category>Door</category>
+		<state>
+			<options>
+				<option value="0">Close</option>
+				<option value="1">Open</option>
+			</options>
+		</state>
+	</channel-type>
+
+	<channel-type id="door-status">
+		<item-type>Number</item-type>
+		<label>Door Status</label>
+		<description>Current status of the door
+		</description>
+		<category>Door</category>
+		<state readOnly="true">
+			<options>
+				<option value="0">Unknown</option>
+				<option value="1">Open</option>
+				<option value="2">Opening</option>
+				<option value="3">Timeout Opening</option>
+				<option value="4">Closed</option>
+				<option value="5">Closing</option>
+				<option value="6">Timeout Closing</option>
+				<option value="7">Door Not Configured</option>
+			</options>
+		</state>
+	</channel-type>
+
+</thing:thing-descriptions>

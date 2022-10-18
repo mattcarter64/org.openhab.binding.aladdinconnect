@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="aladdinconnect"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<!-- -->
+	<bridge-type id="aladdinconnectbridge">
+		<label>Aladdin Connect Bridge</label>
+		<description>Bridge for Aladdin Connect Garage Doors</description>
+
+		<channels>
+			<channel id="discovery" typeId="discovery"/>
+		</channels>
+
+		<config-description>
+
+			<parameter-group name="authentication">
+				<context>setup</context>
+				<label>Authentication Parameters</label>
+			</parameter-group>
+
+			<parameter-group name="notifications">
+				<context>setup</context>
+				<label>Notification parameters</label>
+			</parameter-group>
+
+			<parameter-group name="api">
+				<context>setup</context>
+				<label>API parameters</label>
+			</parameter-group>
+
+			<parameter name="userId" type="text" required="true" groupName="authentication">
+				<context>communication</context>
+				<label>User ID</label>
+				<description>User name for Aladdin Connect account</description>
+			</parameter>
+
+			<parameter name="password" type="text" required="true" groupName="authentication">
+				<context>communication</context>
+				<label>Password</label>
+				<description>Password for Aladdin Connect account</description>
+			</parameter>
+
+			<parameter name="authToken" type="text" required="false" groupName="authentication">
+				<context>communication</context>
+				<label>Auth Token</label>
+				<description>Authentication token that is retried from OAUTH call. Will be updated automatically but can be
+					overidden</description>
+			</parameter>
+
+
+			<parameter name="notifications" type="boolean" groupName="notifications">
+				<label>Push Notifications</label>
+				<description>Global control of push notifications. OFF turns off all notifications. ON allows device to turn on or
+					off
+				</description>
+				<default>false</default>
+			</parameter>
+
+
+			<parameter name="apiUrlBase" type="text" required="true" groupName="api">
+				<context>communication</context>
+				<label>API Base URL</label>
+				<description>The base URL for communicating to REST APIs</description>
+				<default>https://pxdqkls7aj.execute-api.us-east-1.amazonaws.com/Android</default>
+			</parameter>
+
+			<parameter name="apiKey" type="text" required="true" groupName="api">
+				<context>communication</context>
+				<label>API Authentication Key</label>
+				<description>API Key sent as X-Api-Key header</description>
+				<default>fkowarQ0dX9Gj1cbB9Xkx1yXZkd6bzVn5x24sECW</default>
+			</parameter>
+
+		</config-description>
+	</bridge-type>
+
+</thing:thing-descriptions>
