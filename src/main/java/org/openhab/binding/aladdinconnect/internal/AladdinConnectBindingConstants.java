@@ -44,7 +44,7 @@ public class AladdinConnectBindingConstants {
     // List of all Channel ids
     public static final String CHANNEL_DISCOVERY_ID = "discovery";
 
-    public static final String CHANNEL_DOOR_STATE = "door-state";
+    public static final String CHANNEL_DOOR_POSITION = "door-position";
     public static final String CHANNEL_DOOR_STATUS = "door-status";
 
     // property IDs
@@ -82,4 +82,6 @@ public class AladdinConnectBindingConstants {
 
     public final static String STATUS_CONNECTED = "Connected";
     public final static String STATUS_NOT_CONFIGURED = "NotConfigured";
+    public static final String THREAD_POOL_NAME = "aladdinthreads";
+    public static final String SCHED_THREAD_POOL_NAME = "aladdinschedthreads";
 }

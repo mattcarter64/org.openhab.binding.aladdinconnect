@@ -1,4 +1,4 @@
-package org.openhab.binding.aladdinconnect.handler;
+package org.openhab.binding.aladdinconnect.model;
 
 public enum ControllerStatusEnum {
 

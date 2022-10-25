@@ -1,25 +1,23 @@
 /**
  * Copyright (c) 2010-2022 Contributors to the openHAB project
- *
+ * <p>
  * See the NOTICE file(s) distributed with this work for additional
  * information.
- *
+ * <p>
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
  * http://www.eclipse.org/legal/epl-2.0
- *
+ * <p>
  * SPDX-License-Identifier: EPL-2.0
  */
 package org.openhab.binding.aladdinconnect.handler;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.aladdinconnect.http.AladdinConnectClient;
 import org.openhab.binding.aladdinconnect.internal.AladdinConnectBindingConstants;
 import org.openhab.binding.aladdinconnect.internal.config.GarageDoorConfig;
+import org.openhab.binding.aladdinconnect.model.AuthenticationException;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
@@ -27,6 +25,7 @@ import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.ThingStatusInfo;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,17 +41,30 @@ public class GarageDoorHandler extends BaseThingHandler {
     private final Logger logger = LoggerFactory.getLogger(GarageDoorHandler.class);
 
     private @Nullable GarageDoorConfig config;
-
-    private static final List<String> DOOR_TARGET_STATE = new ArrayList<String>(Arrays.asList("CloseDoor", "OpenDoor"));
+    private @Nullable AladdinBridgeHandler bridgeHandler;
+    private final AladdinConnectClient aladdinConnectClient;
 
     public GarageDoorHandler(Thing thing) {
         super(thing);
+
+        aladdinConnectClient = AladdinConnectClient.instance(bridgeHandler);
+    }
+
+    public String getId() {
+        String s = thing.getProperties().get(AladdinConnectBindingConstants.PROP_OH_ID);
+        return s != null ? s : "";
     }
 
     @Override
     public void initialize() {
 
         config = getConfigAs(GarageDoorConfig.class);
+
+        bridgeHandler = (AladdinBridgeHandler) getBridge().getHandler();
+
+        logger.debug("initialize: config=[{}], bridge=[{}]", config, bridgeHandler);
+
+        bridgeHandler.registerHandler(this);
 
         // TODO: Initialize the handler.
         // The framework requires you to return from this method quickly, i.e. any network access must be done in
@@ -99,41 +111,51 @@ public class GarageDoorHandler extends BaseThingHandler {
 
         logger.debug("handleCommand: channel id={}", channelUID.getAsString());
 
-        if (AladdinConnectBindingConstants.CHANNEL_DOOR_STATE.equalsIgnoreCase(channelUID.getId())) {
+        if (AladdinConnectBindingConstants.CHANNEL_DOOR_POSITION.equalsIgnoreCase(channelUID.getId())) {
             if (command instanceof DecimalType) {
-                setDoorState((DecimalType) command);
+                setDoorPosition((DecimalType) command);
             }
         }
-        // if (CHANNEL_1.equals(channelUID.getId())) {
-        // if (command instanceof RefreshType) {
-        // // TODO: handle data refresh
-        // }
-        //
-        // // TODO: handle command
-        //
-        // // Note: if communication with thing fails for some reason,
-        // // indicate that by setting the status with detail information:
-        // // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-        // // "Could not control device at IP address x.x.x.x");
-        // }
+    }
+
+    private void setDoorPosition(DecimalType command) {
+
+        String deviceId = this.getThing().getProperties().get(AladdinConnectBindingConstants.PROP_DOOR_ID);
+        String number = this.getThing().getProperties().get(AladdinConnectBindingConstants.PROP_DOOR_NUMBER);
+
+        try {
+            aladdinConnectClient.setDoorState(deviceId, number, command);
+        } catch (AuthenticationException e) {
+            try {
+                logger.info("Authentication failed. Attempting to login and re-try...");
+
+                // try to login once, and then set state again
+                aladdinConnectClient.login();
+                aladdinConnectClient.setDoorState(deviceId, number, command);
+            } catch (Exception ex) {
+                logger.error("Unable to set door state. error={}", ex.getMessage());
+            }
+        } catch (Exception ee) {
+            logger.error("Unable to set door state. error={}", ee.getMessage());
+        }
     }
 
     @Override
     public void dispose() {
-        // TODO Auto-generated method stub
         super.dispose();
+
+        logger.info("dispose:");
     }
 
     @Override
     public void bridgeStatusChanged(ThingStatusInfo bridgeStatusInfo) {
-        // TODO Auto-generated method stub
         super.bridgeStatusChanged(bridgeStatusInfo);
+
+        logger.info("bridgeStatusChanged: status={}", bridgeStatusInfo);
     }
 
-    private void setDoorState(DecimalType command) {
-
-        String targetSttate = DOOR_TARGET_STATE.get(command.intValue());
-
-        logger.info("setDoorState: sending [{}' to door ...", targetSttate);
+    @Override
+    public void updateState(String channelID, State state) {
+        super.updateState(channelID, state);
     }
 }

@@ -32,7 +32,9 @@ import org.eclipse.jetty.client.util.BasicAuthentication;
 import org.eclipse.jetty.client.util.InputStreamContentProvider;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
+import org.openhab.binding.aladdinconnect.model.AuthenticationException;
 import org.openhab.core.io.net.http.HttpUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +62,7 @@ public class JettyUtil {
         public String nonProxyHosts = null;
     }
 
-    public static HttpResponse executeHttpRequest(HttpRequest request) throws IOException {
+    public static HttpResponse executeHttpRequest(HttpRequest request) throws IOException, AuthenticationException {
 
         LOG.debug("request={}", request);
 
@@ -85,10 +87,13 @@ public class JettyUtil {
 
         HttpResponse httpResponse = new HttpResponse();
 
-        ContentResponse response = executeUrlAndGetReponse(request, url, proxyParams);
+        ContentResponse response = executeUrlAndGetResponse(request, url, proxyParams);
 
         String encoding = response.getEncoding() != null ? response.getEncoding().replaceAll("\"", "").trim() : "UTF-8";
 
+        if (response.getStatus() == HttpStatus.UNAUTHORIZED_401) {
+            throw new AuthenticationException("Not authorized");
+        }
         try {
             httpResponse.setStatusCode(response.getStatus());
             httpResponse.setStatusText(response.getReason());
@@ -101,8 +106,8 @@ public class JettyUtil {
         return httpResponse;
     }
 
-    private static ContentResponse executeUrlAndGetReponse(HttpRequest httpRequest, String url, ProxyParams proxyParams)
-            throws IOException {
+    private static ContentResponse executeUrlAndGetResponse(HttpRequest httpRequest, String url,
+            ProxyParams proxyParams) throws IOException {
 
         startHttpClient(CLIENT);
 

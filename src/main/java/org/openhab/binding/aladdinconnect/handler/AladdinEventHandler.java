@@ -3,24 +3,22 @@ package org.openhab.binding.aladdinconnect.handler;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.websocket.api.Session;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketClose;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketConnect;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketError;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketFrame;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketMessage;
-import org.eclipse.jetty.websocket.api.annotations.WebSocket;
+import org.eclipse.jetty.websocket.api.annotations.*;
 import org.eclipse.jetty.websocket.api.extensions.Frame;
 import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
-import org.openhab.binding.aladdinconnect.internal.config.AladdinBridgeConfig;
+import org.eclipse.jetty.websocket.common.WebSocketSession;
+import org.openhab.binding.aladdinconnect.internal.AladdinConnectBindingConstants;
 import org.openhab.binding.aladdinconnect.util.ThreadManager;
+import org.openhab.core.common.ThreadPoolManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,12 +28,20 @@ public class AladdinEventHandler {
 
     private static final String WSURI = "wss://event-caster.st1.gdocntl.net/updates";
 
-    private AladdinBridgeConfig config;
-
     private WebSocketClient client;
+    private MyWebSocket websocket;
 
-    public AladdinEventHandler(AladdinBridgeConfig config) {
-        this.config = config;
+    private final AladdinBridgeHandler bridgeHandler;
+
+    private boolean stayRunning = true;
+
+    private boolean connected = false;
+
+    private static final ReentrantLock connectingLock = new ReentrantLock();
+    private static final Condition connectingCondition = connectingLock.newCondition();
+
+    public AladdinEventHandler(AladdinBridgeHandler bridgeHandler) {
+        this.bridgeHandler = bridgeHandler;
     }
 
     public void start() throws Exception {
@@ -48,10 +54,30 @@ public class AladdinEventHandler {
 
         client.start();
 
-        setup();
+        while (stayRunning) {
+            if (!connected) {
+                try {
+                    connectingLock.lock();
+
+                    connect();
+
+                    try {
+                        connectingCondition.await(20, TimeUnit.SECONDS);
+                    } catch (InterruptedException ignored) {
+                    }
+                } finally {
+                    connectingLock.unlock();
+                }
+            }
+
+            try {
+                Thread.sleep(5000);
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
-    private void setup() throws Exception {
+    private void connect() throws Exception {
 
         URI destUri = new URI(WSURI);
 
@@ -59,14 +85,16 @@ public class AladdinEventHandler {
 
         request = setupHeaders(request);
 
-        logger.info("setup: connecting to: {}", destUri);
+        logger.info("connect: connecting to: {}", destUri);
 
-        client.connect(new MyWebSocket(), destUri, request);
+        websocket = new MyWebSocket();
+
+        client.connect(websocket, destUri, request);
     }
 
     private ClientUpgradeRequest setupHeaders(ClientUpgradeRequest request) {
 
-        request.setHeader("Authorization", "Bearer " + config.getAuthToken());
+        request.setHeader("Authorization", bridgeHandler.getBearerHeader());
 
         return request;
     }
@@ -78,6 +106,12 @@ public class AladdinEventHandler {
         client.stop();
 
         client = null;
+
+        websocket.stopPingTask(null);
+
+        websocket = null;
+
+        stayRunning = false;
     }
 
     @WebSocket
@@ -85,24 +119,98 @@ public class AladdinEventHandler {
 
         private final Logger logger = LoggerFactory.getLogger(MyWebSocket.class);
 
-        private final CountDownLatch closeLatch = new CountDownLatch(1);
+        // private final CountDownLatch closeLatch = new CountDownLatch(1);
 
         private ScheduledFuture<?> pingTask;
 
         @OnWebSocketConnect
         public void onConnect(Session session) throws IOException {
 
-            logger.info("onConnect: session={}", session);
+            try {
+                connectingLock.lock();
 
-            startPingTask(session);
+                logger.info("onConnect: session={}", session);
+
+                startPingTask(session);
+
+                logger.info("onConnect: upgrade response={}, batch mode={}", session.getUpgradeResponse(),
+                        ((WebSocketSession) session).getBatchMode());
+
+                connected = true;
+
+                connectingCondition.signal();
+            } finally {
+                connectingLock.unlock();
+            }
         }
 
         @OnWebSocketMessage
         public void onMessage(Session session, String message) {
 
-            logger.info("onMessage: message={}", message);
+            logger.info("onMessage(String): message={}", message);
 
             updateStatus(message);
+        }
+
+        // @OnWebSocketMessage
+        // public void onMessage(Session session, Reader reader) {
+        //
+        // logger.info("onMessage(Reader):");
+        // }
+
+        @OnWebSocketMessage
+        public void onMessage(Session session, byte buf[], int offset, int length) {
+
+            logger.info("onMessage(buf[]): buf={}", new String(buf));
+        }
+
+        // @OnWebSocketMessage
+        // public void onMessage(Session session, InputStream stream) {
+        //
+        // logger.info("onMessage(InputStream):");
+        // }
+
+        @OnWebSocketFrame
+        public void onFrame(Session sesison, Frame frame) {
+
+            logger.info("onFrame: message={}", frame);
+        }
+
+        @OnWebSocketClose
+        public void onClose(Session session, int statusCode, String reason) {
+
+            logger.info("onClose: status={}, reason={}", statusCode, reason);
+
+            try {
+                connectingLock.lock();
+
+                stopPingTask(session);
+
+                connected = false;
+
+                connectingCondition.signal();
+            } finally {
+                connectingLock.unlock();
+            }
+        }
+
+        //
+        @OnWebSocketError
+        public void onError(Session session, Throwable error) {
+
+            try {
+                connectingLock.lock();
+
+                logger.error("onError: message={}, session={}", error.getMessage(), session);
+
+                stopPingTask(session);
+
+                connected = false;
+
+                connectingCondition.signal();
+            } finally {
+                connectingLock.unlock();
+            }
         }
 
         /*
@@ -132,33 +240,6 @@ public class AladdinEventHandler {
             // TODO Auto-generated method stub
         }
 
-        @OnWebSocketClose
-        public void onClose(Session session, int statusCode, String reason) {
-
-            logger.info("onClose: status={}, reason={}", statusCode, reason);
-
-            stopPingTask(session);
-        }
-
-        @OnWebSocketFrame
-        public void onFrame(Session sesison, Frame frame) {
-
-            logger.info("onFrame: message={}", frame);
-        }
-
-        public boolean awaitClose(int duration, TimeUnit unit) throws InterruptedException {
-            return this.closeLatch.await(duration, unit);
-        }
-
-        @OnWebSocketError
-        public void onError(Session session, Throwable error) {
-
-            logger.error("onError: message={}", error.getMessage());
-            logger.error("onError: session={}", session, error);
-
-            stopPingTask(session);
-        }
-
         private void startPingTask(Session session) {
 
             logger.info("startPingTask:");
@@ -175,6 +256,10 @@ public class AladdinEventHandler {
                 pingTask = null;
             }
         }
+
+        // public boolean awaitClose(int duration, TimeUnit unit) throws InterruptedException {
+        // return this.closeLatch.await(duration, unit);
+        // }
     }
 
     public class SendPingTask implements Runnable {
@@ -193,8 +278,18 @@ public class AladdinEventHandler {
             logger.debug("run: sendPing()");
 
             try {
+                // String token = bridgeHandler.getAuthToken();
+
                 session.getRemote().sendPing(ByteBuffer.allocate(8).putLong(System.currentTimeMillis()).flip());
-            } catch (IOException e) {
+                // session.getRemote().sendPing(ByteBuffer.allocate(token.length()).put(token.getBytes()));
+
+                logger.debug("scheduling door update task ...");
+
+                ScheduledFuture<?> task = ThreadPoolManager
+                        .getScheduledPool(AladdinConnectBindingConstants.SCHED_THREAD_POOL_NAME)
+                        .schedule(new UpdateDoorStatusTask(bridgeHandler), 10, TimeUnit.SECONDS);
+                task.get();
+            } catch (Exception e) {
                 logger.error("Error sending ping.", e);
             }
         }

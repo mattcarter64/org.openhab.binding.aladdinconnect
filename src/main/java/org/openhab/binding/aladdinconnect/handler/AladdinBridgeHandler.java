@@ -1,5 +1,6 @@
 package org.openhab.binding.aladdinconnect.handler;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -31,8 +32,14 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
 
     private AladdinEventHandler eventHandler = null;
 
+    private final Map<String, GarageDoorHandler> doorHandlers = new HashMap<>();
+
     public AladdinBridgeHandler(Bridge bridge) {
         super(bridge);
+    }
+
+    public Map<String, GarageDoorHandler> getDoorHandlers() {
+        return doorHandlers;
     }
 
     @Override
@@ -43,11 +50,14 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
         logger.info("initialize: config={}", config);
 
         Channel channel = getThing().getChannel(AladdinConnectBindingConstants.CHANNEL_DISCOVERY_ID);
+
         if (channel != null) {
             updateState(channel.getUID(), OnOffType.OFF);
         }
 
-        startEventHandler();
+        scheduler.execute(() -> {
+            startEventHandler();
+        });
 
         updateStatus(ThingStatus.ONLINE);
     }
@@ -73,6 +83,13 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
 
         // check for changes
         config = getThing().getConfiguration().as(AladdinBridgeConfig.class);
+
+        for (Entry<String, Object> configurationParameter : configurationParameters.entrySet()) {
+            if ("authToken".equalsIgnoreCase(configurationParameter.getKey())) {
+                startEventHandler();
+                break;
+            }
+        }
 
         if (previousConfig == null) {
             return;
@@ -126,8 +143,6 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
                 discoveryService.startDiscovery(channelUID);
             } else if (action.equals(OnOffType.OFF)) {
                 discoveryService.stopDiscovery();
-
-                startEventHandler();
             }
         }
     }
@@ -159,6 +174,21 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
         return super.getConfigAs(configurationClass);
     }
 
+    public String getBearerHeader() {
+
+        return "Bearer " + config.getAuthToken();
+    }
+
+    public String getAuthToken() {
+
+        return config.getAuthToken();
+    }
+
+    public String getApiKey() {
+
+        return config.getApiKey();
+    }
+
     @Override
     public void dispose() {
 
@@ -176,7 +206,7 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
         stopEventHandler();
 
         // TODO need to tighten this up a bit. Maybe retry after new auth token, etc.
-        eventHandler = new AladdinEventHandler(config);
+        eventHandler = new AladdinEventHandler(this);
 
         try {
             eventHandler.start();
@@ -199,5 +229,10 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
 
             }
         }
+    }
+
+    public void registerHandler(GarageDoorHandler handler) {
+
+        doorHandlers.put(handler.getId(), handler);
     }
 }
