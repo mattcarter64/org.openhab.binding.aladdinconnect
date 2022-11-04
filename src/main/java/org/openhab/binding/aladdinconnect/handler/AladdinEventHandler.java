@@ -17,8 +17,6 @@ import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
 import org.eclipse.jetty.websocket.common.WebSocketSession;
 import org.openhab.binding.aladdinconnect.internal.AladdinConnectBindingConstants;
-import org.openhab.binding.aladdinconnect.util.ThreadManager;
-import org.openhab.core.common.ThreadPoolManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -244,7 +242,9 @@ public class AladdinEventHandler {
 
             logger.info("startPingTask:");
 
-            pingTask = ThreadManager.scheduleFixedRateTask(new SendPingTask(session), 10, 45, TimeUnit.SECONDS);
+            // pingTask = ThreadManager.scheduleFixedRateTask(new SendPingTask(session), 10, 45, TimeUnit.SECONDS);
+            pingTask = AladdinConnectBindingConstants.getScheduledThreadPool()
+                    .scheduleAtFixedRate(new SendPingTask(session), 10, 45, TimeUnit.SECONDS);
         }
 
         private void stopPingTask(Session session) {
@@ -282,13 +282,6 @@ public class AladdinEventHandler {
 
                 session.getRemote().sendPing(ByteBuffer.allocate(8).putLong(System.currentTimeMillis()).flip());
                 // session.getRemote().sendPing(ByteBuffer.allocate(token.length()).put(token.getBytes()));
-
-                logger.debug("scheduling door update task ...");
-
-                ScheduledFuture<?> task = ThreadPoolManager
-                        .getScheduledPool(AladdinConnectBindingConstants.SCHED_THREAD_POOL_NAME)
-                        .schedule(new UpdateDoorStatusTask(bridgeHandler), 10, TimeUnit.SECONDS);
-                task.get();
             } catch (Exception e) {
                 logger.error("Error sending ping.", e);
             }

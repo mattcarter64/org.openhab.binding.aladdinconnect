@@ -3,6 +3,8 @@ package org.openhab.binding.aladdinconnect.handler;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
@@ -33,6 +35,7 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
     private AladdinEventHandler eventHandler = null;
 
     private final Map<String, GarageDoorHandler> doorHandlers = new HashMap<>();
+    private ScheduledFuture<?> updateDoorStatusTask;
 
     public AladdinBridgeHandler(Bridge bridge) {
         super(bridge);
@@ -55,8 +58,10 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
             updateState(channel.getUID(), OnOffType.OFF);
         }
 
-        scheduler.execute(() -> {
-            startEventHandler();
+        AladdinConnectBindingConstants.getThreadPool().execute(() -> {
+            // TODO not really needed right now as we dont use it... need to put in a thread cuz its blocking
+            // startEventHandler();
+            startDoorUpdateStatusTask();
         });
 
         updateStatus(ThingStatus.ONLINE);
@@ -86,7 +91,7 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
 
         for (Entry<String, Object> configurationParameter : configurationParameters.entrySet()) {
             if ("authToken".equalsIgnoreCase(configurationParameter.getKey())) {
-                startEventHandler();
+                // startEventHandler();
                 break;
             }
         }
@@ -139,6 +144,7 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
 
             if (action.equals(OnOffType.ON)) {
                 stopEventHandler();
+                stopDoorStatusUpdateTask();
 
                 discoveryService.startDiscovery(channelUID);
             } else if (action.equals(OnOffType.OFF)) {
@@ -163,7 +169,8 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
         if (isInitialized()) {
             if (AladdinConnectBindingConstants.CHANNEL_DISCOVERY_ID.equalsIgnoreCase(channelUID.getId())) {
                 if (state.equals(OnOffType.OFF)) {
-                    startEventHandler();
+                    // startEventHandler();
+                    startDoorUpdateStatusTask();
                 }
             }
         }
@@ -197,6 +204,28 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
         super.dispose();
 
         stopEventHandler();
+
+        stopDoorStatusUpdateTask();
+    }
+
+    private void startDoorUpdateStatusTask() {
+
+        logger.info("scheduling door update task ...");
+
+        stopDoorStatusUpdateTask();
+
+        updateDoorStatusTask = AladdinConnectBindingConstants.getScheduledThreadPool()
+                .scheduleAtFixedRate(new UpdateDoorStatusTask(this), 5, 5, TimeUnit.MINUTES);
+    }
+
+    private void stopDoorStatusUpdateTask() {
+
+        if (updateDoorStatusTask != null) {
+            logger.info("stopping door update task ...");
+
+            updateDoorStatusTask.cancel(true);
+            updateDoorStatusTask = null;
+        }
     }
 
     private void startEventHandler() {
@@ -217,9 +246,9 @@ public class AladdinBridgeHandler extends BaseBridgeHandler {
 
     private void stopEventHandler() {
 
-        logger.info("stopEventHandler:");
-
         if (eventHandler != null) {
+            logger.info("stopEventHandler:");
+
             try {
                 eventHandler.stop();
 

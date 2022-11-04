@@ -21,6 +21,9 @@
 			<channel id="door-position" typeId="door-position">
 				<label>Requested state of door</label>
 			</channel>
+
+			<channel id="last-status-ts" typeId="last-status-ts"/>
+			<channel id="updated-at" typeId="updated-at"/>
 		</channels>
 
 		<config-description>

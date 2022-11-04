@@ -13,10 +13,13 @@
 package org.openhab.binding.aladdinconnect.internal;
 
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.thing.ThingTypeUID;
 
 /**
@@ -46,6 +49,8 @@ public class AladdinConnectBindingConstants {
 
     public static final String CHANNEL_DOOR_POSITION = "door-position";
     public static final String CHANNEL_DOOR_STATUS = "door-status";
+    public static final String CHANNEL_DOOR_LAST_EVENT_TS = "last-event-ts";
+    public static final String CHANNEL_DOOR_LAST_EVENT = "last-event";
 
     // property IDs
     public final static String PROP_OH_ID = "id";
@@ -84,4 +89,12 @@ public class AladdinConnectBindingConstants {
     public final static String STATUS_NOT_CONFIGURED = "NotConfigured";
     public static final String THREAD_POOL_NAME = "aladdinthreads";
     public static final String SCHED_THREAD_POOL_NAME = "aladdinschedthreads";
+
+    public static ScheduledExecutorService getScheduledThreadPool() {
+        return ThreadPoolManager.getScheduledPool(SCHED_THREAD_POOL_NAME);
+    }
+
+    public static Executor getThreadPool() {
+        return ThreadPoolManager.getPool(THREAD_POOL_NAME);
+    }
 }

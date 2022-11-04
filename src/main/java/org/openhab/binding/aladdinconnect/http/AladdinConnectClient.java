@@ -24,7 +24,7 @@ public class AladdinConnectClient {
 
     private static final Gson gson = new Gson();
     private final AladdinBridgeHandler bridgeHandler;
-    private final AladdinBridgeConfig config;
+    // private final AladdinBridgeConfig config;
 
     private static AladdinConnectClient instance;
 
@@ -40,7 +40,11 @@ public class AladdinConnectClient {
     private AladdinConnectClient(AladdinBridgeHandler bridgeHandler) {
 
         this.bridgeHandler = bridgeHandler;
-        this.config = bridgeHandler.getConfigAs(AladdinBridgeConfig.class);
+        // this.config = bridgeHandler.getConfigAs(AladdinBridgeConfig.class);
+    }
+
+    private AladdinBridgeConfig getBridgeConfig() {
+        return bridgeHandler.getConfigAs(AladdinBridgeConfig.class);
     }
 
     // {
@@ -56,7 +60,7 @@ public class AladdinConnectClient {
 
         logger.info("login:");
 
-        String url = config.getApiUrlBase() + AladdinConnectBindingConstants.LOGIN_ENDPOINT;
+        String url = getBridgeConfig().getApiUrlBase() + AladdinConnectBindingConstants.LOGIN_ENDPOINT;
 
         HttpPOSTRequest request = new HttpPOSTRequest(url, TimeUnit.SECONDS.toMillis(5));
 
@@ -64,8 +68,8 @@ public class AladdinConnectClient {
 
         OauthRequestBody body = new OauthRequestBody();
 
-        body.setUsername(config.getUserId());
-        body.setPassword(config.getPassword());
+        body.setUsername(getBridgeConfig().getUserId());
+        body.setPassword(getBridgeConfig().getPassword());
 
         logger.debug("login: OAUTH data=[{}]", body);
 
@@ -91,16 +95,15 @@ public class AladdinConnectClient {
 
     public List<Door> getDoors() throws IOException, AuthenticationException {
 
-        logger.info("getDevices:");
+        logger.info("getDoors:");
 
-        String url = bridgeHandler.getConfigAs(AladdinBridgeConfig.class).getApiUrlBase()
-                + AladdinConnectBindingConstants.DEVICE_ENDPOINT;
+        String url = getBridgeConfig().getApiUrlBase() + AladdinConnectBindingConstants.DEVICE_ENDPOINT;
 
         HttpGETRequest request = new HttpGETRequest(url, TimeUnit.SECONDS.toMillis(5));
 
         //
         request.setHeaders(setupOauthHeaders());
-        request.getHeaders().put("Authorization", "Bearer " + config.getAuthToken());
+        request.getHeaders().put("Authorization", "Bearer " + getBridgeConfig().getAuthToken());
 
         HttpResponse response = JettyUtil.executeHttpRequest(request);
 
@@ -113,9 +116,9 @@ public class AladdinConnectClient {
 
         String targetState = DOOR_TARGET_STATE.get(command.intValue());
 
-        AladdinBridgeConfig bridgeConfig = bridgeHandler.getConfigAs(AladdinBridgeConfig.class);
+        // AladdinBridgeConfig bridgeConfig = bridgeHandler.getConfigAs(AladdinBridgeConfig.class);
 
-        String url = bridgeConfig.getApiUrlBase() + AladdinConnectBindingConstants.DEVICE_ENDPOINT + "/" + deviceId
+        String url = getBridgeConfig().getApiUrlBase() + AladdinConnectBindingConstants.DEVICE_ENDPOINT + "/" + deviceId
                 + "/door/" + deviceNumber + "/command";
 
         logger.info("setDoorState: sending '{}' to url [{}] ...", targetState, url);
@@ -155,8 +158,6 @@ public class AladdinConnectClient {
             logger.warn("Received status code {} from HTTP call", response.getStatusCode());
         } catch (IOException e) {
             logger.error("Error sending command.", e);
-        } catch (AuthenticationException e) {
-            throw e;
         }
     }
 
@@ -168,14 +169,14 @@ public class AladdinConnectClient {
         headers.put("AppVersion", AladdinConnectBindingConstants.AUTH_APP_VERSION);
         headers.put("BundleName", AladdinConnectBindingConstants.AUTH_BUNDLE_NAME);
         headers.put("BuildVersion", AladdinConnectBindingConstants.AUTH_BUILD_VERSION);
-        headers.put("X-Api-Key", config.getApiKey());
+        headers.put("X-Api-Key", getBridgeConfig().getApiKey());
 
         return headers;
     }
 
     private List<Door> processDevicesResponse(HttpResponse response) {
 
-        logger.info("processDevicesResponse: response=[{}]", response);
+        logger.debug("processDevicesResponse: response=[{}]", response);
 
         List<Door> doors = new ArrayList<>();
 

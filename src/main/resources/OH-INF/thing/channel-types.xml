@@ -47,4 +47,18 @@
 		</state>
 	</channel-type>
 
+	<channel-type id="last-status-ts">
+		<item-type>DateTime</item-type>
+		<label>Last Status Update</label>
+		<description>Timestamp of the last status update</description>
+		<state readOnly="true"/>
+	</channel-type>
+
+	<channel-type id="updated-at">
+		<item-type>String</item-type>
+		<label>Last Update</label>
+		<description>Timestamp of last update time</description>
+		<state readOnly="true"/>
+	</channel-type>
+
 </thing:thing-descriptions>
